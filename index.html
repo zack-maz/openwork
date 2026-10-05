@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Job tracker</title>
+<style>
+:root{--void:#0A0A0A;--panel:#0D0F12;--hairline:#1E2227;--line-strong:#2A2F35;--muted:#7C848D;--text:#C9CDD2;--bright:#E8EBED;--accent:#7AA2F7;--good:#9ECE6A;--warn:#E0AF68;--bad:#F7768E;
+--sans:"Hanken Grotesk","Helvetica Neue",Arial,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--void);color:var(--text);font:16px/1.6 var(--sans)}
+main{max-width:760px;margin:0 auto;padding:32px 24px 80px}
+h1{font-size:28px;line-height:1.1;letter-spacing:-.03em;color:var(--bright);margin:0 0 4px}
+.label,label span{font:11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+a{color:var(--bright)}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:24px;border-bottom:1px solid var(--hairline);padding-bottom:16px}
+button,select,input,textarea{font:14px var(--sans);color:var(--bright);background:var(--panel);border:1px solid var(--line-strong);border-radius:6px;padding:8px 10px;width:100%}
+button{width:auto;cursor:pointer}button:hover{border-color:var(--muted)}
+button.primary{border-color:var(--accent);color:var(--accent)}
+.row{border-top:1px solid var(--hairline);padding:14px 0;display:flex;justify-content:space-between;gap:12px;cursor:pointer}
+.row:first-child{border-top:0}
+.name{color:var(--bright);font-size:18px}
+.meta{color:var(--muted);font-size:14px}
+.pill{font:11px var(--mono);letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line-strong);border-radius:99px;padding:2px 8px;white-space:nowrap;align-self:flex-start}
+.s-interviewing{color:var(--good)}.s-waiting{color:var(--warn)}.s-none{color:var(--muted)}
+section{margin-top:40px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid .full{grid-column:1/-1}
+label{display:block}label span{display:block;margin-bottom:4px}
+.panel{background:var(--panel);border:1px solid var(--hairline);border-radius:8px;padding:16px;margin-top:12px}
+.actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+#status{font:11px var(--mono);color:var(--muted)}
+.hide{display:none}
+@media(max-width:560px){.grid{grid-template-columns:1fr}main{padding:24px 16px 80px}}
+</style></head><body><main>
+<header><div><div class="label">applications</div><h1>Job tracker</h1></div>
+<div><button id="sync" class="primary">Sync</button> <button id="cfg">GitHub</button></div></header>
+<div id="status"></div>
+<section id="list"></section>
+<div class="actions"><button id="add" class="primary">+ Application</button></div>
+<section id="edit" class="hide"></section>
+<section><div class="label">contacts</div><div id="contacts"></div><div class="actions"><button id="addc">+ Contact</button></div></section>
+<section id="cfgp" class="hide panel">
+<div class="label">github sync</div>
+<p class="meta">Data is stored as data.json in a private repo. The token stays in this browser only.</p>
+<div class="grid"><label><span>Owner</span><input id="o" placeholder="zack-maz"></label><label><span>Repo</span><input id="r" placeholder="job-tracker-data"></label>
+<label><span>Path</span><input id="p" placeholder="data.json"></label><label><span>Fine-grained token (contents: read/write)</span><input id="t" type="password"></label></div>
+<div class="actions"><button id="savecfg" class="primary">Save</button></div></section>
+</main>
+<script>
+const STATUS=[["","unset"],["not applied","not applied"],["waiting back","waiting back"],["interviewing","interviewing"]];
+const blank=()=>({id:crypto.randomUUID(),company:"",role:"",link:"",status:"",resume:"",cv:"",round:"",lastContact:"",pocId:"",notes:""});
+let db={apps:[],contacts:[]},sha=null,dirty=false,cur=null;
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const cfg=()=>JSON.parse(localStorage.jtcfg||"{}");
+const say=m=>$("#status").textContent=m;
+function local(){dirty=true;localStorage.jtdb=JSON.stringify(db);say("unsynced changes")}
+if(localStorage.jtdb)db=JSON.parse(localStorage.jtdb);
+const cname=id=>(db.contacts.find(c=>c.id===id)||{}).name||"";
+function render(){
+ $("#list").innerHTML=db.apps.map(a=>`<div class="row" data-id="${a.id}"><div><div class="name">${esc(a.company)||"(no name)"}</div><div class="meta">${esc(a.role)}${a.round?" · "+esc(a.round):""}${a.lastContact?" · last contact "+esc(a.lastContact):""}${cname(a.pocId)?" · "+esc(cname(a.pocId)):""}</div></div><span class="pill s-${a.status==="interviewing"?"interviewing":a.status==="waiting back"?"waiting":"none"}">${esc(a.status||"unset")}</span></div>`).join("")||'<p class="meta">Nothing yet.</p>';
+ $("#contacts").innerHTML=db.contacts.map(c=>`<div class="row" data-c="${c.id}"><div><div class="name">${esc(c.name)||"(no name)"}</div><div class="meta">${esc(c.company)} ${esc(c.title)}</div></div><div class="meta">${esc(c.email)}</div></div>`).join("")||'<p class="meta">No contacts yet.</p>';
+}
+function f(k,l,v,t="text",full){return `<label class="${full?"full":""}"><span>${l}</span><input data-k="${k}" type="${t}" value="${esc(v)}"></label>`}
+function editApp(id){
+ const a=db.apps.find(x=>x.id===id);cur=id;const e=$("#edit");e.classList.remove("hide");
+ e.innerHTML=`<div class="label">edit</div><div class="grid panel">${f("company","Company",a.company)}${f("role","Role",a.role)}${f("link","Job app link",a.link,"url",1)}
+ <label><span>Status</span><select data-k="status">${STATUS.map(([v,l])=>`<option value="${v}" ${v===a.status?"selected":""}>${l}</option>`).join("")}</select></label>${f("round","Current round",a.round)}
+ ${f("resume","Resume applied with",a.resume)}${f("cv","CV applied with",a.cv)}${f("lastContact","Last contact",a.lastContact,"date")}
+ <label><span>Point of contact</span><select data-k="pocId"><option value="">none</option>${db.contacts.map(c=>`<option value="${c.id}" ${c.id===a.pocId?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>
+ <label class="full"><span>Notes</span><textarea data-k="notes" rows="3">${esc(a.notes)}</textarea></label></div>
+ <div class="actions"><button id="done" class="primary">Done</button><button id="del">Delete</button></div>`;
+ e.querySelectorAll("[data-k]").forEach(i=>i.oninput=i.onchange=()=>{a[i.dataset.k]=i.value;local();render()});
+ $("#done").onclick=()=>{e.classList.add("hide");cur=null};
+ $("#del").onclick=()=>{if(confirm("Delete this application?")){db.apps=db.apps.filter(x=>x!==a);e.classList.add("hide");local();render()}};
+ e.scrollIntoView({behavior:"smooth"});
+}
+function editC(id){
+ const c=db.contacts.find(x=>x.id===id),e=$("#edit");e.classList.remove("hide");
+ e.innerHTML=`<div class="label">edit contact</div><div class="grid panel">${f("name","Name",c.name)}${f("company","Company",c.company)}${f("title","Title",c.title)}${f("email","Email",c.email,"email")}${f("linkedin","LinkedIn",c.linkedin,"url")}${f("phone","Phone",c.phone,"tel")}
+ <label class="full"><span>Notes</span><textarea data-k="notes" rows="2">${esc(c.notes)}</textarea></label></div><div class="actions"><button id="done" class="primary">Done</button><button id="del">Delete</button></div>`;
+ e.querySelectorAll("[data-k]").forEach(i=>i.oninput=()=>{c[i.dataset.k]=i.value;local();render()});
+ $("#done").onclick=()=>e.classList.add("hide");
+ $("#del").onclick=()=>{if(confirm("Delete this contact?")){db.contacts=db.contacts.filter(x=>x!==c);db.apps.forEach(a=>{if(a.pocId===id)a.pocId=""});e.classList.add("hide");local();render()}};
+ e.scrollIntoView({behavior:"smooth"});
+}
+$("#list").onclick=e=>{const r=e.target.closest("[data-id]");if(r)editApp(r.dataset.id)};
+$("#contacts").onclick=e=>{const r=e.target.closest("[data-c]");if(r)editC(r.dataset.c)};
+$("#add").onclick=()=>{const a=blank();db.apps.unshift(a);local();render();editApp(a.id)};
+$("#addc").onclick=()=>{const c={id:crypto.randomUUID(),name:"",company:"",title:"",email:"",linkedin:"",phone:"",notes:""};db.contacts.push(c);local();render();editC(c.id)};
+$("#cfg").onclick=()=>{const c=cfg();$("#o").value=c.o||"";$("#r").value=c.r||"";$("#p").value=c.p||"data.json";$("#t").value=c.t||"";$("#cfgp").classList.toggle("hide")};
+$("#savecfg").onclick=()=>{localStorage.jtcfg=JSON.stringify({o:$("#o").value.trim(),r:$("#r").value.trim(),p:$("#p").value.trim()||"data.json",t:$("#t").value.trim()});$("#cfgp").classList.add("hide");say("saved");sync()};
+const b64=s=>btoa(unescape(encodeURIComponent(s))),unb64=s=>decodeURIComponent(escape(atob(s.replace(/\n/g,""))));
+async function gh(method,body){const c=cfg();const r=await fetch(`https://api.github.com/repos/${c.o}/${c.r}/contents/${c.p||"data.json"}`,{method,headers:{Authorization:"Bearer "+c.t,Accept:"application/vnd.github+json"},body:body&&JSON.stringify(body)});return r}
+async function sync(){
+ const c=cfg();if(!c.t||!c.o||!c.r){say("local only - set GitHub sync");return}
+ try{say("syncing...");
+  const g=await gh("GET");
+  if(g.ok){const j=await g.json();sha=j.sha;const remote=JSON.parse(unb64(j.content));
+   if(!dirty){db=remote;localStorage.jtdb=JSON.stringify(db);render();say("loaded from GitHub");return}
+   if(!confirm("GitHub has a saved copy and you have unsynced local edits. OK = overwrite GitHub with this device's version. Cancel = load GitHub's.")){db=remote;dirty=false;localStorage.jtdb=JSON.stringify(db);render();say("loaded from GitHub");return}}
+  else if(g.status!==404){say("GitHub error "+g.status);return}
+  const p=await gh("PUT",{message:"update tracker",content:b64(JSON.stringify(db,null,1)),...(sha?{sha}:{})});
+  if(!p.ok){say("save failed "+p.status);return}
+  sha=(await p.json()).content.sha;dirty=false;say("synced "+new Date().toLocaleTimeString());
+ }catch(e){say("sync failed: "+e.message)}
+}
+$("#sync").onclick=sync;render();say(cfg().t?"tap Sync to load/save":"local only - set GitHub sync");
+</script></body></html>
