@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Job tracker</title>
+<title>openwork</title>
 <style>
 :root{--void:#0A0A0A;--panel:#0D0F12;--hairline:#1E2227;--line-strong:#2A2F35;--muted:#7C848D;--text:#C9CDD2;--bright:#E8EBED;--accent:#7AA2F7;--good:#9ECE6A;--warn:#E0AF68;--bad:#F7768E;
 --sans:"Hanken Grotesk","Helvetica Neue",Arial,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
@@ -32,7 +32,7 @@ label{display:block}label span{display:block;margin-bottom:4px}
 .hide{display:none}
 @media(max-width:560px){.grid{grid-template-columns:1fr}main{padding:24px 16px 80px}}
 </style></head><body><main>
-<header><div><div class="label">applications</div><h1>Job tracker</h1></div>
+<header><div><div class="label">applications</div><h1>openwork</h1></div>
 <div><button id="sync" class="primary">Sync</button> <button id="cfg">GitHub</button></div></header>
 <div id="status"></div>
 <section id="list"></section>
@@ -42,7 +42,7 @@ label{display:block}label span{display:block;margin-bottom:4px}
 <section id="cfgp" class="hide panel">
 <div class="label">github sync</div>
 <p class="meta">Data is stored as data.json in a private repo. The token stays in this browser only.</p>
-<div class="grid"><label><span>Owner</span><input id="o" placeholder="zack-maz"></label><label><span>Repo</span><input id="r" placeholder="job-tracker-data"></label>
+<div class="grid"><label><span>Owner</span><input id="o" placeholder="zack-maz"></label><label><span>Repo</span><input id="r" placeholder="openwork-data"></label>
 <label><span>Path</span><input id="p" placeholder="data.json"></label><label><span>Fine-grained token (contents: read/write)</span><input id="t" type="password"></label></div>
 <div class="actions"><button id="savecfg" class="primary">Save</button></div></section>
 </main>
@@ -99,10 +99,11 @@ async function sync(){
    if(!dirty){db=remote;localStorage.jtdb=JSON.stringify(db);render();say("loaded from GitHub");return}
    if(!confirm("GitHub has a saved copy and you have unsynced local edits. OK = overwrite GitHub with this device's version. Cancel = load GitHub's.")){db=remote;dirty=false;localStorage.jtdb=JSON.stringify(db);render();say("loaded from GitHub");return}}
   else if(g.status!==404){say("GitHub error "+g.status);return}
-  const p=await gh("PUT",{message:"update tracker",content:b64(JSON.stringify(db,null,1)),...(sha?{sha}:{})});
+  const p=await gh("PUT",{message:"update openwork data",content:b64(JSON.stringify(db,null,1)),...(sha?{sha}:{})});
   if(!p.ok){say("save failed "+p.status);return}
   sha=(await p.json()).content.sha;dirty=false;say("synced "+new Date().toLocaleTimeString());
  }catch(e){say("sync failed: "+e.message)}
 }
 $("#sync").onclick=sync;render();say(cfg().t?"tap Sync to load/save":"local only - set GitHub sync");
 </script></body></html>
+
